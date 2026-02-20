@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Forge - Transform Any Link Into a QR Code Instantly</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #ffffff;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .hero-section {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .hero-title {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, #00f5ff, #8b00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 40px rgba(0, 245, 255, 0.3);
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .floating-cube {
+            width: 60px;
+            height: 60px;
+            margin: 30px auto;
+            transform-style: preserve-3d;
+            animation: rotateCube 8s infinite linear;
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(139, 0, 255, 0.1));
+            border: 1px solid rgba(0, 245, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .cube-face:nth-child(1) { transform: translateZ(30px); }
+        .cube-face:nth-child(2) { transform: rotateY(90deg) translateZ(30px); }
+        .cube-face:nth-child(3) { transform: rotateY(180deg) translateZ(30px); }
+        .cube-face:nth-child(4) { transform: rotateY(-90deg) translateZ(30px); }
+        .cube-face:nth-child(5) { transform: rotateX(90deg) translateZ(30px); }
+        .cube-face:nth-child(6) { transform: rotateX(-90deg) translateZ(30px); }
+
+        .qr-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.3),
+                0 0 60px rgba(0, 245, 255, 0.1),
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            transform-style: preserve-3d;
+            transition: transform 0.3s ease;
+            animation: fadeInUp 1s ease-out 0.3s both;
+        }
+
+        .qr-card:hover {
+            transform: perspective(1000px) rotateX(var(--rotate-x, 0deg)) rotateY(var(--rotate-y, 0deg));
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        .input-label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 245, 255, 0.3);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .url-input:focus {
+            border-color: #00f5ff;
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .url-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .generate-btn {
+            width: 100%;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #00f5ff, #8b00ff);
+            border: none;
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .generate-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .generate-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 245, 255, 0.4);
+        }
+
+        .error-message {
+            color: #ff4757;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .error-message.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .qr-result {
+            text-align: center;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s ease;
+            margin-top: 30px;
+        }
+
+        .qr-result.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .qr-code-container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 16px;
+            display: inline-block;
+            margin-bottom: 20px;
+            position: relative;
+            animation: pulse 2s infinite;
+        }
+
+        .qr-code-container canvas {
+            display: block !important;
+        }
+
+        .download-btn {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #8b00ff, #00f5ff);
+            border: none;
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 0, 255, 0.4);
+        }
+
+        .footer {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 30px 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.9rem;
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+
+        .footer span {
+            background: linear-gradient(135deg, #00f5ff, #8b00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 600;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes rotateCube {
+            from {
+                transform: rotateX(0deg) rotateY(0deg);
+            }
+            to {
+                transform: rotateX(360deg) rotateY(360deg);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(0, 245, 255, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(0, 245, 255, 0.8);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .qr-card {
+                padding: 30px 20px;
+            }
+            
+            .hero-title {
+                font-size: 2rem;
+            }
+            
+            .hero-subtitle {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particle-canvas"></canvas>
+    
+    <div class="container">
+        <div class="hero-section">
+            <h1 class="hero-title">Transform Any Link Into a QR Code — Instantly</h1>
+            <p class="hero-subtitle">Convert any URL into a scannable QR code that works seamlessly across all devices and QR readers</p>
+            <div class="floating-cube">
+                <div class="cube-face"></div>
+                <div class="cube-face"></div>
+                <div class="cube-face"></div>
+                <div class="cube-face"></div>
+                <div class="cube-face"></div>
+                <div class="cube-face"></div>
+            </div>
+        </div>
+
+        <div class="qr-card" id="qrCard">
+            <div class="input-group">
+                <label class="input-label" for="urlInput">Enter Your URL</label>
+                <input 
+                    type="text" 
+                    id="urlInput" 
+                    class="url-input" 
+                    placeholder="https://example.com"
+                    autocomplete="url"
+                >
+                <div class="error-message" id="errorMessage"></div>
+            </div>
+            
+            <button class="generate-btn" id="generateBtn">
+                Generate QR Code
+            </button>
+            
+            <div class="qr-result" id="qrResult">
+                <div class="qr-code-container" id="qrContainer"></div>
+                <button class="download-btn" id="downloadBtn">Download QR Code</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>Powered by <span>PixelForge AI</span> • Crafting Digital Experiences</p>
+    </footer>
+
+    <script>
+        // Three.js Particle Background
+        class ParticleBackground {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ 
+                    canvas: document.getElementById('particle-canvas'),
+                    alpha: true 
+                });
+                
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.particles = [];
+                this.mouseX = 0;
+                this.mouseY = 0;
+                
+                this.init();
+                this.animate();
+                
+                window.addEventListener('resize', () => this.onResize());
+                window.addEventListener('mousemove', (e) => this.onMouseMove(e));
+            }
+            
+            init() {
+                const particleCount = 150;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const colors = new Float32Array(particleCount * 3);
+                
+                for (let i = 0; i < particleCount * 3; i += 3) {
+                    positions[i] = (Math.random() - 0.5) * 20;
+                    positions[i + 1] = (Math.random() - 0.5) * 20;
+                    positions[i + 2] = (Math.random() - 0.5) * 20;
+                    
+                    const color = new THREE.Color();
+                    color.setHSL(Math.random() * 0.1 + 0.5, 1, 0.5);
+                    colors[i] = color.r;
+                    colors[i + 1] = color.g;
+                    colors[i + 2] = color.b;
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                
+                const material = new THREE.PointsMaterial({
+                    size: 0.1,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                this.particleSystem = new THREE.Points(geometry, material);
+                this.scene.add(this.particleSystem);
+                
+                this.camera.position.z = 10;
+            }
+            
+            onMouseMove(event) {
+                this.mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+                this.mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            }
+            
+            onResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                this.particleSystem.rotation.x += 0.001;
+                this.particleSystem.rotation.y += 0.002;
+                
+                this.particleSystem.position.x = this.mouseX * 0.5;
+                this.particleSystem.position.y = this.mouseY * 0.5;
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // 3D Card Tilt Effect
+        class Card3DEffect {
+            constructor(card) {
+                this.card = card;
+                this.card.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.card.addEventListener('mouseleave', () => this.onMouseLeave());
+            }
+            
+            onMouseMove(e) {
+                const rect = this.card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const rotateX = ((y - centerY) / centerY) * -10;
+                const rotateY = ((x - centerX) / centerX) * 10;
+                
+                this.card.style.setProperty('--rotate-x', `${rotateX}deg`);
+                this.card.style.setProperty('--rotate-y', `${rotateY}deg`);
+            }
+            
+            onMouseLeave() {
+                this.card.style.setProperty('--rotate-x', '0deg');
+                this.card.style.setProperty('--rotate-y', '0deg');
+            }
+        }
+
+        // QR Code Generator
+        class QRCodeGenerator {
+            constructor() {
+                this.urlInput = document.getElementById('urlInput');
+                this.generateBtn = document.getElementById('generateBtn');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.qrResult = document.getElementById('qrResult');
+                this.qrContainer = document.getElementById('qrContainer');
+                this.downloadBtn = document.getElementById('downloadBtn');
+                this.currentQRCode = null;
+                
+                this.init();
+            }
+            
+            init() {
+                this.generateBtn.addEventListener('click', () => this.generateQRCode());
+                this.urlInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.generateQRCode();
+                    }
+                });
+                this.downloadBtn.addEventListener('click', () => this.downloadQRCode());
+                
+                this.urlInput.addEventListener('input', () => {
+                    this.hideError();
+                });
+            }
+            
+            isValidURL(url) {
+                try {
+                    const urlObj = new URL(url);
+                    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+                } catch {
+                    return false;
+                }
+            }
+            
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.classList.add('show');
+            }
+            
+            hideError() {
+                this.errorMessage.classList.remove('show');
+            }
+            
+            generateQRCode() {
+                const url = this.urlInput.value.trim();
+                
+                if (!url) {
+                    this.showError('Please enter a URL');
+                    return;
+                }
+                
+                if (!this.isValidURL(url)) {
+                    this.showError('Please enter a valid URL (e.g., https://example.com)');
+                    return;
+                }
+                
+                this.hideError();
+                
+                // Clear previous QR code
+                this.qrContainer.innerHTML = '';
+                
+                // Generate new QR code
+                this.currentQRCode = new QRCode(this.qrContainer, {
+                    text: url,
+                    width: 256,
+                    height: 256,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                
+                // Show result with animation
+                setTimeout(() => {
+                    this.qrResult.classList.add('show');
+                }, 100);
+            }
+            
+            downloadQRCode() {
+                const canvas = this.qrContainer.querySelector('canvas');
+                if (!canvas) return;
+                
+                const link = document.createElement('a');
+                link.download = 'qrcode.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            }
+        }
+
+        // Initialize everything
+        document.addEventListener('DOMContentLoaded', () => {
+            new ParticleBackground();
+            new Card3DEffect(document.getElementById('qrCard'));
+            new QRCodeGenerator();
+        });
+    </script>
+</body>
+</html>
